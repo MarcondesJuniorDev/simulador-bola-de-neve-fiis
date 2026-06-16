@@ -338,6 +338,43 @@ export const useFiiStore = defineStore('fii', () => {
     }
   }
 
+  // 3. Sharing Logic
+  const shareUrl = computed(() => {
+    const url = new URL(window.location.origin + window.location.pathname)
+    url.searchParams.set('ticker', ticker.value)
+    url.searchParams.set('price', price.value.toFixed(2))
+    url.searchParams.set('dividend', dividend.value.toFixed(4))
+    url.searchParams.set('contrib', monthlyContribution.value.toFixed(0))
+    url.searchParams.set('shares', currentShares.value.toString())
+    return url.toString()
+  })
+
+  function loadFromUrlParams() {
+    const params = new URLSearchParams(window.location.search)
+    let loaded = false
+    if (params.has('ticker')) {
+      ticker.value = params.get('ticker').toUpperCase()
+      loaded = true
+    }
+    if (params.has('price')) {
+      price.value = parseFloat(params.get('price')) || price.value
+      loaded = true
+    }
+    if (params.has('dividend')) {
+      dividend.value = parseFloat(params.get('dividend')) || dividend.value
+      loaded = true
+    }
+    if (params.has('contrib')) {
+      monthlyContribution.value = parseFloat(params.get('contrib')) || monthlyContribution.value
+      loaded = true
+    }
+    if (params.has('shares')) {
+      currentShares.value = parseInt(params.get('shares')) || currentShares.value
+      loaded = true
+    }
+    return loaded
+  }
+
   return {
     ticker,
     price,
@@ -360,11 +397,13 @@ export const useFiiStore = defineStore('fii', () => {
     yieldOnCost,
     monthsToMagicNumber,
     projectionData,
+    shareUrl,
     saveToken,
     selectPopular,
     searchTicker,
     clearHistory,
     toggleTheme,
     applyTheme,
+    loadFromUrlParams,
   }
 })

@@ -4,6 +4,7 @@ import { useFiiStore } from './stores/fii'
 import TickerSearch from './components/TickerSearch.vue'
 import SimulationInputs from './components/SimulationInputs.vue'
 import MagicResultCard from './components/MagicResultCard.vue'
+import GrowthChart from './components/GrowthChart.vue'
 import GrowthProjection from './components/GrowthProjection.vue'
 import AdSenseBanner from './components/AdSenseBanner.vue'
 import SettingsModal from './components/SettingsModal.vue'
@@ -12,11 +13,20 @@ const store = useFiiStore()
 const isSettingsOpen = ref(false)
 
 onMounted(() => {
-  // Apply saved theme preference on load
   store.applyTheme()
 
-  // Pre-load default simulator data with MXRF11
-  store.searchTicker('MXRF11')
+  const hasParams = store.loadFromUrlParams()
+  const params = new URLSearchParams(window.location.search)
+
+  if (!hasParams) {
+    store.searchTicker('MXRF11')
+  } else {
+    // If they provided a ticker but no price/dividend, fetch it.
+    // If they provided price/dividend, keep them so we don't overwrite custom inputs.
+    if (params.has('ticker') && (!params.has('price') || !params.has('dividend'))) {
+      store.searchTicker(store.ticker)
+    }
+  }
 })
 </script>
 
@@ -174,6 +184,7 @@ onMounted(() => {
         <!-- Right Column: Results & Projections (span 7) -->
         <section class="lg:col-span-7 flex flex-col gap-6 w-full">
           <MagicResultCard />
+          <GrowthChart />
           <GrowthProjection />
 
           <!-- Mobile AdSpace (Horizontal) -->
