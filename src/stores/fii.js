@@ -15,7 +15,7 @@ export const useFiiStore = defineStore('fii', () => {
   const monthlyContribution = ref(200) // default R$ 200/month
   const isDark = ref(localStorage.getItem('theme') !== 'light') // defaults to dark
 
-  const brapiToken = ref(localStorage.getItem('brapi_token') || '')
+  const brapiToken = ref(localStorage.getItem('brapi_token') || import.meta.env.VITE_BRAPI_TOKEN || '')
   const history = ref(JSON.parse(localStorage.getItem('fii_history') || '[]'))
 
   // Popular FIIs
