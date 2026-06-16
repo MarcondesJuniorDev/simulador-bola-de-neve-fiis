@@ -6,6 +6,7 @@ import SimulationInputs from './components/SimulationInputs.vue'
 import MagicResultCard from './components/MagicResultCard.vue'
 import GrowthChart from './components/GrowthChart.vue'
 import GrowthProjection from './components/GrowthProjection.vue'
+import FiiEducationalFaq from './components/FiiEducationalFaq.vue'
 import AdSenseBanner from './components/AdSenseBanner.vue'
 import SettingsModal from './components/SettingsModal.vue'
 
@@ -193,6 +194,9 @@ onMounted(() => {
           </div>
         </section>
       </div>
+
+      <!-- Educational FAQ Section -->
+      <FiiEducationalFaq />
     </main>
 
     <!-- Bottom Footer AdSpace (Horizontal) -->
@@ -213,6 +217,15 @@ onMounted(() => {
           Investimentos em renda variável possuem riscos. Consulte um profissional certificado antes
           de investir.
         </p>
+        <div
+          class="flex justify-center gap-4 mt-4 text-[10px] text-slate-400 dark:text-slate-500 font-semibold"
+        >
+          <a
+            href="/politica-de-privacidade.html"
+            class="hover:text-emerald-500 dark:hover:text-emerald-400 underline"
+            >Política de Privacidade</a
+          >
+        </div>
         <p class="text-[10px] text-slate-400 dark:text-slate-600 mt-6">
           © 2026 Simulador Número Mágico FII. Todos os direitos reservados. Hospedado na Cloudflare
           Pages.
