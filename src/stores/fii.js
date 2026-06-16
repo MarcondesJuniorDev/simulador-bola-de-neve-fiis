@@ -10,10 +10,15 @@ export const useFiiStore = defineStore('fii', () => {
   const error = ref(null)
   const isDemoData = ref(false)
 
+  // New States for Improvements
+  const currentShares = ref(10) // default 10 cotas
+  const monthlyContribution = ref(200) // default R$ 200/month
+  const isDark = ref(localStorage.getItem('theme') !== 'light') // defaults to dark
+
   const brapiToken = ref(localStorage.getItem('brapi_token') || '')
   const history = ref(JSON.parse(localStorage.getItem('fii_history') || '[]'))
 
-  // Popular FIIs for quick simulations and demo fallback
+  // Popular FIIs
   const popularFiis = ref([
     { symbol: 'MXRF11', name: 'Maxi Renda FII', price: 10.05, dividend: 0.09, type: 'Papel' },
     {
@@ -60,7 +65,7 @@ export const useFiiStore = defineStore('fii', () => {
     },
   ])
 
-  // Getters (Computed)
+  // Getters
   const magicNumber = computed(() => {
     if (price.value <= 0 || dividend.value <= 0) return 0
     return Math.ceil(price.value / dividend.value)
@@ -79,7 +84,81 @@ export const useFiiStore = defineStore('fii', () => {
     return (dividend.value / price.value) * 100
   })
 
-  // Watchers to sync state
+  // 1. Month Estimator to Magic Number
+  const monthsToMagicNumber = computed(() => {
+    if (price.value <= 0 || dividend.value <= 0) return 0
+    const target = magicNumber.value
+    if (target <= 0) return 0
+    if (currentShares.value >= target) return 0
+
+    let cotas = currentShares.value
+    let cash = 0
+    let months = 0
+
+    // Simulate month by month
+    while (cotas < target && months < 1200) {
+      months++
+      // Receive dividend
+      cash += cotas * dividend.value
+      // Add contribution
+      cash += monthlyContribution.value
+      // Buy new cotas
+      const newCotas = Math.floor(cash / price.value)
+      cotas += newCotas
+      cash -= newCotas * price.value
+    }
+
+    return months
+  })
+
+  // 2. Growth Projection
+  const projectionData = computed(() => {
+    if (price.value <= 0 || dividend.value <= 0) return []
+
+    let cotas = currentShares.value
+    let cash = 0
+    let totalUserInvested = currentShares.value * price.value
+
+    const milestones = [
+      { label: '1 Ano', months: 12 },
+      { label: '3 Anos', months: 36 },
+      { label: '5 Anos', months: 60 },
+      { label: '10 Anos', months: 120 },
+    ]
+
+    const results = []
+    let milestoneIdx = 0
+
+    for (let m = 1; m <= 120; m++) {
+      // Receive dividend
+      cash += cotas * dividend.value
+      // Add contribution
+      cash += monthlyContribution.value
+      totalUserInvested += monthlyContribution.value
+
+      // Buy new cotas
+      const newCotas = Math.floor(cash / price.value)
+      cotas += newCotas
+      cash -= newCotas * price.value
+
+      if (m === milestones[milestoneIdx].months) {
+        results.push({
+          label: milestones[milestoneIdx].label,
+          months: m,
+          cotas,
+          totalEquity: cotas * price.value + cash,
+          totalInvested: totalUserInvested,
+          monthlyIncome: cotas * dividend.value,
+        })
+        milestoneIdx++
+        if (milestoneIdx >= milestones.length) break
+      }
+    }
+
+    return results
+  })
+
+  // Watchers
   watch(
     history,
     (newHistory) => {
@@ -89,6 +168,20 @@ export const useFiiStore = defineStore('fii', () => {
   )
 
   // Actions
+  function toggleTheme() {
+    isDark.value = !isDark.value
+    localStorage.setItem('theme', isDark.value ? 'dark' : 'light')
+    applyTheme()
+  }
+
+  function applyTheme() {
+    if (isDark.value) {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
+  }
+
   function saveToken(token) {
     brapiToken.value = token
     if (token) {
@@ -109,10 +202,8 @@ export const useFiiStore = defineStore('fii', () => {
 
   function addToHistory(symbol, lastPrice, lastDividend, name = '') {
     const uppercaseSymbol = symbol.toUpperCase()
-    // Remove if already exists to push to front
     history.value = history.value.filter((item) => item.symbol !== uppercaseSymbol)
 
-    // Add to start
     history.value.unshift({
       symbol: uppercaseSymbol,
       name: name || `${uppercaseSymbol} FII`,
@@ -121,7 +212,6 @@ export const useFiiStore = defineStore('fii', () => {
       timestamp: Date.now(),
     })
 
-    // Limit to 5 items
     if (history.value.length > 5) {
       history.value.pop()
     }
@@ -140,9 +230,7 @@ export const useFiiStore = defineStore('fii', () => {
     error.value = null
     isDemoData.value = false
 
-    // 1. Check if token is available
     if (!brapiToken.value) {
-      // Check if it's a test ticker that doesn't need token (or popular mock)
       const popular = popularFiis.value.find((f) => f.symbol === cleanSymbol)
       if (popular) {
         price.value = popular.price
@@ -155,7 +243,6 @@ export const useFiiStore = defineStore('fii', () => {
         return
       }
 
-      // Test tickers for Brapi (e.g. PETR4, MGLU3, VALE3, ITUB4)
       const isTestTicker = ['PETR4', 'MGLU3', 'VALE3', 'ITUB4'].includes(cleanSymbol)
       if (!isTestTicker) {
         loading.value = false
@@ -170,7 +257,6 @@ export const useFiiStore = defineStore('fii', () => {
       let fetchedDividend = 0
       let name = ''
 
-      // Call primary endpoint: Quote with dividends=true
       const tokenParam = brapiToken.value ? `&token=${brapiToken.value}` : ''
       const quoteUrl = `https://brapi.dev/api/quote/${cleanSymbol}?dividends=true${tokenParam}`
 
@@ -191,7 +277,6 @@ export const useFiiStore = defineStore('fii', () => {
       fetchedPrice = result.regularMarketPrice || 0
       name = result.shortName || result.longName || ''
 
-      // Attempt to extract the latest dividend from dividendsData
       if (
         result.dividendsData &&
         result.dividendsData.cashDividends &&
@@ -203,7 +288,6 @@ export const useFiiStore = defineStore('fii', () => {
         fetchedDividend = sortedDividends[0].rate || sortedDividends[0].value || 0
       }
 
-      // If dividend is 0 and it's a FII, let's try the dedicated FII dividend history endpoint
       if (fetchedDividend === 0 && brapiToken.value) {
         try {
           const fiiUrl = `https://brapi.dev/api/v2/fii/dividends?symbols=${cleanSymbol}${tokenParam}`
@@ -225,14 +309,12 @@ export const useFiiStore = defineStore('fii', () => {
         }
       }
 
-      // Update state if price is valid
       if (fetchedPrice > 0) {
         price.value = fetchedPrice
-        // Only override dividend if we found a non-zero value, else keep previous or set default and let user adjust
         if (fetchedDividend > 0) {
           dividend.value = Number(fetchedDividend.toFixed(4))
         } else {
-          dividend.value = dividend.value || 0.1 // keep previous or set fallback
+          dividend.value = dividend.value || 0.1
           error.value =
             'Preço obtido! No entanto, não encontramos histórico recente de dividendos. Por favor, ajuste o valor do dividendo manualmente.'
         }
@@ -258,6 +340,9 @@ export const useFiiStore = defineStore('fii', () => {
     loading,
     error,
     isDemoData,
+    currentShares,
+    monthlyContribution,
+    isDark,
     brapiToken,
     history,
     popularFiis,
@@ -265,9 +350,13 @@ export const useFiiStore = defineStore('fii', () => {
     totalInvested,
     monthlyIncome,
     yieldOnCost,
+    monthsToMagicNumber,
+    projectionData,
     saveToken,
     selectPopular,
     searchTicker,
     clearHistory,
+    toggleTheme,
+    applyTheme,
   }
 })
