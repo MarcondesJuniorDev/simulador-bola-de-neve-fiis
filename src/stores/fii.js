@@ -330,9 +330,16 @@ export const useFiiStore = defineStore('fii', () => {
       }
     } catch (err) {
       console.error(err)
-      error.value =
-        err.message ||
-        'Erro desconhecido ao carregar os dados. Você pode preencher os valores manualmente.'
+      const popular = popularFiis.value.find((f) => f.symbol === cleanSymbol)
+      if (popular) {
+        price.value = popular.price
+        dividend.value = popular.dividend
+        isDemoData.value = true
+        addToHistory(popular.symbol, popular.price, popular.dividend, popular.name)
+        error.value = `Dados de demonstração carregados como backup. (Falha na API: ${err.message}).`
+      } else {
+        error.value = `${err.message} Você ainda pode preencher os valores manualmente abaixo.`
+      }
     } finally {
       loading.value = false
     }
