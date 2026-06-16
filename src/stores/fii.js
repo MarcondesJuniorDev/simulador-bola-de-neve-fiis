@@ -261,19 +261,40 @@ export const useFiiStore = defineStore('fii', () => {
       let fetchedPrice = 0
       let fetchedDividend = 0
       let name = ''
+      let isFreePlan = false
 
       const tokenParam = brapiToken.value ? `&token=${brapiToken.value}` : ''
       const quoteUrl = `https://brapi.dev/api/quote/${cleanSymbol}?dividends=true${tokenParam}`
 
-      const res = await fetch(quoteUrl)
+      let res = await fetch(quoteUrl)
+      let data
+
       if (!res.ok) {
-        if (res.status === 401 || res.status === 403) {
-          throw new Error('Token Inválido ou Expirado. Verifique as configurações da API Brapi.')
+        // Fallback for free plan when dividends=true is not authorized
+        const fallbackUrl = `https://brapi.dev/api/quote/${cleanSymbol}${tokenParam ? `?${tokenParam.slice(1)}` : ''}`
+        res = await fetch(fallbackUrl)
+        if (!res.ok) {
+          if (res.status === 401 || res.status === 403) {
+            throw new Error('Token Inválido ou Expirado. Verifique as configurações da API Brapi.')
+          }
+          throw new Error(`Ativo não encontrado ou erro na API (${res.status})`)
         }
-        throw new Error(`Ativo não encontrado ou erro na API (${res.status})`)
+        data = await res.json()
+        isFreePlan = true
+      } else {
+        data = await res.json()
+        // Check if the response returned a successful HTTP code but API-level error for dividends
+        if (data.error && data.code === 'FEATURE_NOT_AVAILABLE') {
+          const fallbackUrl = `https://brapi.dev/api/quote/${cleanSymbol}${tokenParam ? `?${tokenParam.slice(1)}` : ''}`
+          res = await fetch(fallbackUrl)
+          if (!res.ok) {
+            throw new Error(`Erro na API de cotações (${res.status})`)
+          }
+          data = await res.json()
+          isFreePlan = true
+        }
       }
 
-      const data = await res.json()
       if (!data.results || data.results.length === 0) {
         throw new Error('Ticker não encontrado na API Brapi.')
       }
@@ -282,7 +303,9 @@ export const useFiiStore = defineStore('fii', () => {
       fetchedPrice = result.regularMarketPrice || 0
       name = result.shortName || result.longName || ''
 
+      // Parse dividends if available
       if (
+        !isFreePlan &&
         result.dividendsData &&
         result.dividendsData.cashDividends &&
         result.dividendsData.cashDividends.length > 0
@@ -293,35 +316,20 @@ export const useFiiStore = defineStore('fii', () => {
         fetchedDividend = sortedDividends[0].rate || sortedDividends[0].value || 0
       }
 
-      if (fetchedDividend === 0 && brapiToken.value) {
-        try {
-          const fiiUrl = `https://brapi.dev/api/v2/fii/dividends?symbols=${cleanSymbol}${tokenParam}`
-          const fiiRes = await fetch(fiiUrl)
-          if (fiiRes.ok) {
-            const fiiData = await fiiRes.json()
-            if (fiiData.results && fiiData.results.length > 0) {
-              const fiiResult = fiiData.results[0]
-              if (fiiResult.dividends && fiiResult.dividends.length > 0) {
-                const sortedFiiDividends = [...fiiResult.dividends].sort(
-                  (a, b) => new Date(b.paymentDate) - new Date(a.paymentDate),
-                )
-                fetchedDividend = sortedFiiDividends[0].value || sortedFiiDividends[0].rate || 0
-              }
-            }
-          }
-        } catch (fiiErr) {
-          console.warn('FII dedicated endpoint failed:', fiiErr)
-        }
-      }
-
       if (fetchedPrice > 0) {
         price.value = fetchedPrice
-        if (fetchedDividend > 0) {
+
+        if (isFreePlan) {
+          // Retain previous or set a standard default and alert the user
+          dividend.value = dividend.value || 0.1
+          error.value =
+            'Preço obtido! O histórico automático de dividendos requer plano pago da Brapi. Ajuste o dividendo manualmente abaixo.'
+        } else if (fetchedDividend > 0) {
           dividend.value = Number(fetchedDividend.toFixed(4))
         } else {
           dividend.value = dividend.value || 0.1
           error.value =
-            'Preço obtido! No entanto, não encontramos histórico recente de dividendos. Por favor, ajuste o valor do dividendo manualmente.'
+            'Preço obtido! No entanto, não encontramos histórico recente de dividendos. Ajuste o dividendo manualmente abaixo.'
         }
 
         addToHistory(cleanSymbol, price.value, dividend.value, name)
