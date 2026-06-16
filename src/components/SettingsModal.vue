@@ -16,7 +16,7 @@ const tokenInput = ref('')
 const showToken = ref(false)
 
 onMounted(() => {
-  tokenInput.value = store.brapiToken
+  tokenInput.value = store.userToken
 })
 
 const handleSave = () => {
@@ -104,7 +104,9 @@ const handleClear = () => {
               id="token-input"
               v-model="tokenInput"
               :type="showToken ? 'text' : 'password'"
-              placeholder="Digite ou cole seu token"
+              :placeholder="
+                store.hasSystemToken ? '•••••••• (Chave padrão ativa)' : 'Digite ou cole seu token'
+              "
               class="w-full pl-4 pr-10 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl font-mono text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
             />
             <button
@@ -154,7 +156,7 @@ const handleClear = () => {
 
         <div class="flex justify-end gap-2 mt-4">
           <button
-            v-if="store.brapiToken"
+            v-if="store.userToken"
             @click="handleClear"
             type="button"
             class="px-4 py-2 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-semibold rounded-xl text-sm hover:bg-slate-50 dark:hover:bg-slate-800/50 active:scale-95 transition-all"

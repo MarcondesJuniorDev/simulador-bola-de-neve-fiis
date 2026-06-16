@@ -15,7 +15,12 @@ export const useFiiStore = defineStore('fii', () => {
   const monthlyContribution = ref(200) // default R$ 200/month
   const isDark = ref(localStorage.getItem('theme') !== 'light') // defaults to dark
 
-  const brapiToken = ref(localStorage.getItem('brapi_token') || import.meta.env.VITE_BRAPI_TOKEN || '')
+  const userToken = ref(localStorage.getItem('brapi_token') || '')
+  const systemToken = import.meta.env.VITE_BRAPI_TOKEN || ''
+
+  const brapiToken = computed(() => userToken.value || systemToken)
+  const hasSystemToken = computed(() => !!systemToken)
+  const hasUserToken = computed(() => !!userToken.value)
   const history = ref(JSON.parse(localStorage.getItem('fii_history') || '[]'))
 
   // Popular FIIs
@@ -183,7 +188,7 @@ export const useFiiStore = defineStore('fii', () => {
   }
 
   function saveToken(token) {
-    brapiToken.value = token
+    userToken.value = token
     if (token) {
       localStorage.setItem('brapi_token', token)
     } else {
@@ -343,6 +348,9 @@ export const useFiiStore = defineStore('fii', () => {
     currentShares,
     monthlyContribution,
     isDark,
+    userToken,
+    hasSystemToken,
+    hasUserToken,
     brapiToken,
     history,
     popularFiis,
